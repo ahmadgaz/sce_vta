@@ -3,16 +3,20 @@ import functools
 from urllib.parse import urlencode
 from typing import TypedDict, Union, Callable, List, Any
 
-CACHE_DURATION = 60
+CACHE_DURATION = 10  # Change to 5 minutes for production
 
 
-class Cache(TypedDict, total=False):
+class CachedQuery(TypedDict, total=False):
     data: Any
     timestamp: float
 
 
+class Cache(TypedDict, total=False):
+    query: CachedQuery
+
+
 def use_cache(
-    cache: Cache = {}, duration: int = CACHE_DURATION, length: int = 0
+    duration: int = CACHE_DURATION, cache: Cache = {}, length: int = 0
 ) -> List[Union[Callable[[], Cache], Callable[[Any], Cache]]]:
     """
     Returns a list of functions to get and set cache.
@@ -47,7 +51,7 @@ def check_cache(*args, **kwargs):
     :return: Decorator
     """
 
-    get_cache, set_cache = kwargs["cache"]
+    get_cache, set_cache = args[0]  # This is a use_cache() instance
 
     def decorator(func):
         @functools.wraps(func)

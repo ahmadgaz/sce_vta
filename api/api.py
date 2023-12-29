@@ -1,67 +1,66 @@
-import os
-import json
-import random
-import requests
+import uvicorn
 from fastapi import FastAPI
-from dotenv import load_dotenv
-from cache import check_cache, use_cache
+from datetime import datetime
+from typing import TypedDict, List
+from endpoint_cache import check_cache, use_cache
+from external_api import get_expected_arrivals
 
-load_dotenv()
 app = FastAPI()
 
 
-@app.get("/get_operators")
-@check_cache(cache=use_cache())
-def get_operators():
-    response = json.loads(
-        requests.get(
-            "http://api.511.org/transit/operators?api_key=" + os.getenv("511_API_TOKEN")
-        ).content
-    )
-    return response
+class Predictions(TypedDict):
+    route: str
+    times: List[str]
 
 
-@app.get("/get_lines")
-@check_cache(cache=use_cache())
-def get_lines(operator_id: str = "SC"):
-    response = json.loads(
-        requests.get(
-            "http://api.511.org/transit/lines?api_key="
-            + os.getenv("511_API_TOKEN")
-            + "&operator_id="
-            + operator_id
-        ).content
-    )
-    return response
+class Stop(TypedDict):
+    id: str
+    name: str
+    predictions: List[Predictions]
 
 
-@app.get("/get_stops")
-@check_cache(cache=use_cache())
-def get_stops(operator_id: str = "SC", line_id: str = "Rapid 500"):
-    response = json.loads(
-        requests.get(
-            "http://api.511.org/transit/stops?api_key="
-            + os.getenv("511_API_TOKEN")
-            + "&operator_id="
-            + operator_id
-            + "&line_id="
-            + line_id
-        ).content
-    )
-    return response
+@app.get("/predictions")
+@check_cache(use_cache())
+def predictions(
+    operator_id: str = "SC", line_id: str = "Rapid 500", stop_id: str = "64995"
+):
+    try:
+        stop_monitoring = get_expected_arrivals(operator_id, stop_id)
+        if "Error" in stop_monitoring:
+            raise Exception(stop_monitoring["Error"])
+        monitored_stop_visits = [
+            visit["MonitoredVehicleJourney"]
+            for visit in stop_monitoring["ServiceDelivery"]["StopMonitoringDelivery"][
+                "MonitoredStopVisit"
+            ]
+            if visit["MonitoredVehicleJourney"]["LineRef"] == line_id
+        ]
+        if not monitored_stop_visits:
+            raise Exception("No monitored stop visits")
+        stop_name = monitored_stop_visits[0]["MonitoredCall"]["StopPointName"]
+        response: List[Stop] = [
+            {
+                "id": stop_id,
+                "name": stop_name,
+                "predictions": [
+                    {
+                        "route": line_id,
+                        "times": [
+                            datetime.fromisoformat(
+                                visit["MonitoredCall"]["ExpectedArrivalTime"].rstrip(
+                                    "Z"
+                                )
+                            )
+                            for visit in monitored_stop_visits
+                        ],
+                    }
+                ],
+            }
+        ]
+        return response
+    except Exception as error:
+        return {"Error": error}
 
 
-@app.get("/get_patterns")
-@check_cache(cache=use_cache())
-def get_patterns(operator_id: str = "SC", line_id: str = "Rapid 500"):
-    response = json.loads(
-        requests.get(
-            "http://api.511.org/transit/patterns?api_key"
-            + os.getenv("511_API_TOKEN")
-            + "&operator_id="
-            + operator_id
-            + "&line_id="
-            + line_id
-        ).content
-    )
-    return response
+if __name__ == "__main__":
+    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True, access_log=True)
