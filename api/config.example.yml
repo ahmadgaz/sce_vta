@@ -1,0 +1,6 @@
+api_key: asdfasdf-12312asdf-...
+stops:
+    - operator: SC
+      stop_id: 64995
+    - operator: CT
+      stop_id: 70261
