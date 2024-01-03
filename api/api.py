@@ -88,5 +88,4 @@ def update_cached_arrivals():
 if __name__ == "__main__":
     thread = threading.Thread(target=update_cached_arrivals)
     thread.start()
-    app.state.cached_arrivals = get_expected_arrivals()
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True, access_log=True)
