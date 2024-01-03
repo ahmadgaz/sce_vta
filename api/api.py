@@ -1,6 +1,4 @@
-import time
 import uvicorn
-import threading
 from fastapi import FastAPI
 from datetime import datetime
 from collections import defaultdict
@@ -27,8 +25,7 @@ class Stop(TypedDict):
 @app.get("/predictions")
 def predictions():
     try:
-        expected_arrivals = cached_arrivals
-        print(expected_arrivals)
+        expected_arrivals = get_expected_arrivals()
         if "Error" in expected_arrivals:
             raise Exception(expected_arrivals)
         stops = list(map(map_expected_arrival_to_stop, expected_arrivals))
@@ -51,8 +48,8 @@ def map_expected_arrival_to_stop(expected_arrival) -> Stop:
                 "ServiceDelivery": expected_arrival["ServiceDelivery"],
             }
         )
-    stop_id = monitored_vehicle_journeys[0]["MonitoredCall"]["StopPointRef"]
-    operator = monitored_vehicle_journeys[0]["OperatorRef"]
+    stop_id = expected_arrival["stop_id"]
+    operator = expected_arrival["operator"]
     stop_name = monitored_vehicle_journeys[0]["MonitoredCall"]["StopPointName"]
     route_times = map_route_times(monitored_vehicle_journeys)
     predictions: List[Predictions] = [
@@ -78,14 +75,5 @@ def map_route_times(monitored_vehicle_journeys, idx=0):
     return {**route_times, route: [*route_times.get(route, []), time]}
 
 
-def update_cached_arrivals():
-    global cached_arrivals
-    while True:
-        cached_arrivals = get_expected_arrivals()
-        time.sleep(600)  # Sleep for 10 minutes (600 seconds)
-
-
 if __name__ == "__main__":
-    thread = threading.Thread(target=update_cached_arrivals)
-    thread.start()
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True, access_log=True)
