@@ -1,11 +1,24 @@
-import uvicorn
-from fastapi import FastAPI
+from tracemalloc import stop
+import prometheus_client
 from datetime import datetime
 from collections import defaultdict
-from external_api import get_expected_arrivals
+from fastapi import FastAPI, Response
 from typing import TypedDict, TypeVar, List
+from external_api import get_expected_arrivals
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+requests_count = prometheus_client.Counter(
+    "requests_count",
+    "Total number of requests",
+)
 
 T = TypeVar("T")
 
@@ -25,6 +38,7 @@ class Stop(TypedDict):
 @app.get("/predictions")
 def predictions():
     try:
+        requests_count.inc()
         expected_arrivals = get_expected_arrivals()
         if "Error" in expected_arrivals:
             raise Exception(expected_arrivals)
@@ -32,6 +46,18 @@ def predictions():
         return stops
     except Exception as error:
         return error
+
+
+@app.get("/metrics")
+def get_metrics():
+    with open("metrics.txt", "a") as file:
+        file.write(
+            f"request_time: {datetime.now()}\trequest_count: {requests_count._value.get()}\n"
+        )
+    return Response(
+        media_type="text/plain",
+        content=prometheus_client.generate_latest(),
+    )
 
 
 def map_expected_arrival_to_stop(expected_arrival) -> Stop:
@@ -68,12 +94,17 @@ def map_route_times(monitored_vehicle_journeys, idx=0):
         return defaultdict(list)
     mvj = monitored_vehicle_journeys[idx]
     route = mvj["LineRef"]
-    time = datetime.fromisoformat(
-        mvj["MonitoredCall"]["ExpectedArrivalTime"].rstrip("Z")
-    )
+    if not route:
+        return map_route_times(monitored_vehicle_journeys, idx + 1)
+    if mvj["MonitoredCall"]["ExpectedArrivalTime"]:
+        time = datetime.fromisoformat(
+            mvj["MonitoredCall"]["ExpectedArrivalTime"].rstrip("Z")
+        )
+    elif mvj["MonitoredCall"]["AimedArrivalTime"]:
+        time = datetime.fromisoformat(
+            mvj["MonitoredCall"]["AimedArrivalTime"].rstrip("Z")
+        )
+    else:
+        return map_route_times(monitored_vehicle_journeys, idx + 1)
     route_times = map_route_times(monitored_vehicle_journeys, idx + 1)
     return {**route_times, route: [*route_times.get(route, []), time]}
-
-
-if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True, access_log=True)

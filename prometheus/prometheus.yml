@@ -1,0 +1,7 @@
+global:
+    scrape_interval: 5s
+
+scrape_configs:
+    - job_name: "predictions_api"
+      static_configs:
+          - targets: ["predictions_api:8000"]

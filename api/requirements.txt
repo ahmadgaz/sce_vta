@@ -3,3 +3,5 @@ python-dotenv
 fastapi
 uvicorn
 pyyaml
+Jinja2==3.0.2
+py-grpc-prometheus==0.7.0
