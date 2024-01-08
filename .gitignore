@@ -2,5 +2,4 @@ __pycache__
 .vscode
 .env
 env
-metrics.txt
 config.yml

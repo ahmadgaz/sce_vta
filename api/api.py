@@ -50,10 +50,6 @@ def predictions():
 
 @app.get("/metrics")
 def get_metrics():
-    with open("metrics.txt", "a") as file:
-        file.write(
-            f"request_time: {datetime.now()}\trequest_count: {requests_count._value.get()}\n"
-        )
     return Response(
         media_type="text/plain",
         content=prometheus_client.generate_latest(),
