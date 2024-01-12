@@ -1,8 +1,7 @@
-from tracemalloc import stop
 import prometheus_client
 from datetime import datetime
 from collections import defaultdict
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, HTTPException, Response
 from typing import TypedDict, TypeVar, List
 from external_api import get_expected_arrivals
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,9 +14,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-requests_count = prometheus_client.Counter(
-    "requests_count",
+REQUEST_COUNT = prometheus_client.Counter(
+    "REQUEST_COUNT",
     "Total number of requests",
+)
+
+CACHE_LAST_UPDATED = prometheus_client.Gauge(
+    "CACHE_LAST_UPDATED",
+    "Last time cache was updated",
 )
 
 T = TypeVar("T")
@@ -38,14 +42,21 @@ class Stop(TypedDict):
 @app.get("/predictions")
 def predictions():
     try:
-        requests_count.inc()
+        REQUEST_COUNT.inc()
+        CACHE_LAST_UPDATED.set_to_current_time()
         expected_arrivals = get_expected_arrivals()
-        if "Error" in expected_arrivals:
-            raise Exception(expected_arrivals)
         stops = list(map(map_expected_arrival_to_stop, expected_arrivals))
         return stops
-    except Exception as error:
-        return error
+    except Exception as e:
+        error, status_code, status, response = e.args
+        details = str(
+            {
+                "status": str(status),
+                "error": str(error),
+                "response": str(response),
+            }
+        )
+        raise HTTPException(status_code, details)
 
 
 @app.get("/metrics")
