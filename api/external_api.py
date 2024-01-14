@@ -1,24 +1,17 @@
+from re import M
 import yaml
 import json
 import requests
-import prometheus_client
+
+from api.metrics import MetricsHandler
+
+MetricsHandler.instance()
 
 EXTERNAL_API_ERROR_STATUS = {
     401: "Unauthorized",
     404: "Not Found",
     500: "Internal Server Error",
 }
-
-EXTERNAL_API_LATENCY = prometheus_client.Histogram(
-    "EXTERNAL_API_LATENCY",
-    "Latency of 511 API requests",
-)
-
-EXTERNAL_API_HTTP_RESPONSE_CODES = prometheus_client.Counter(
-    "EXTERNAL_API_HTTP_RESPONSE_CODES",
-    "HTTP response codes of 511 API requests",
-    ["code"],
-)
 
 
 def get_expected_arrivals():
@@ -54,19 +47,21 @@ def get_expected_arrival(api_key, stop):
     return response
 
 
-@EXTERNAL_API_LATENCY.time()
+@MetricsHandler.external_api_latency.time()
 def get_data(url: str):
     try:
         response = requests.get(url)
         if response.status_code in EXTERNAL_API_ERROR_STATUS:
-            EXTERNAL_API_HTTP_RESPONSE_CODES.labels(response.status_code).inc()
+            MetricsHandler.external_api_http_response_codes.labels(
+                response.status_code
+            ).inc()
             return {
                 "error": "Error getting data from 511 API",
                 "status_code": response.status_code,
                 "status": EXTERNAL_API_ERROR_STATUS[response.status_code],
                 "response": response.text,
             }
-        EXTERNAL_API_HTTP_RESPONSE_CODES.labels(200).inc()
+        MetricsHandler.external_api_http_response_codes.labels(200).inc()
         return json.loads(response.content)
     except requests.exceptions.RequestException as error:
         return {
