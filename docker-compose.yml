@@ -1,15 +1,22 @@
 version: "3"
 services:
+    predictions_api:
+        build: .
+        ports:
+            - "8000:8000"
+        volumes:
+            - ./server.py:/app/server.py:ro
+            - ./config.yml:/app/config.yml:ro
+            - ./modules:/app/modules:ro
+
     nginx:
-        build: ./nginx
+        image: nginx:latest
         ports:
             - "80:80"
         depends_on:
             - predictions_api
-
-        # for development
         volumes:
-            - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./nginx.conf:/etc/nginx/nginx.conf:ros
 
     prometheus:
         image: prom/prometheus:latest
@@ -18,24 +25,6 @@ services:
         depends_on:
             - predictions_api
         volumes:
-            - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
         command:
             - --config.file=/etc/prometheus/prometheus.yml
-
-    predictions_api:
-        build: ./api
-        ports:
-            - "8000:8000"
-
-        # for development
-        volumes:
-            - ./api:/app:ro
-
-    test:
-        build: ./prometheus
-        depends_on:
-            - nginx
-
-        # for development
-        volumes:
-            - ./prometheus/test.py:/app/test.py:ro
