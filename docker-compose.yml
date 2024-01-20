@@ -26,10 +26,3 @@ services:
             - "8000:8000"
         volumes:
             - ./api:/app:ro
-
-    test:
-        build: ./prometheus
-        depends_on:
-            - nginx
-        volumes:
-            - ./prometheus/test.py:/app/test.py:ro
