@@ -16,7 +16,7 @@ services:
         depends_on:
             - predictions_api
         volumes:
-            - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
         command:
             - --config.file=/etc/prometheus/prometheus.yml
 
