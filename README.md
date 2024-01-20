@@ -25,7 +25,7 @@ The SCE VTA App is a real-time transit prediction application using the 511 API.
 2.  **Request 511 API Key**  
     Request a 511 API key from [511.org](https://511.org/open-data/token)
 
-3.  **Configuration**
+3.  **Configuration**  
     Create a `config.yml` file in the root directory of the project. Use `config.example.yml` as a template. Replace the `api_key` value with your 511 API key.
 
 4.  **Set Up a Python Virtual Environment**  
